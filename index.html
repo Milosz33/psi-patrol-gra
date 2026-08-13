@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PSI Patrol: Przygodowe Miasto</title>
+<style>
+  :root{
+    --blue:#2d8fe0; --red:#e0432d; --yellow:#f2c12e; --green:#4caf50;
+    --pink:#f06ba8; --orange:#f28a2e; --dark:#1b2430; --panel:#ffffffee;
+    --sky1:#7ec8ff; --sky2:#cdeeff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;background:#0d1b2a;user-select:none;}
+  #game-wrap{position:relative;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(#0d1b2a,#13293d);}
+  #stage{position:relative;width:960px;height:540px;max-width:100vw;max-height:100vh;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  #game-canvas{display:block;width:100%;height:100%;background:linear-gradient(var(--sky1),var(--sky2));image-rendering:auto;border-radius:6px;}
+
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,#1a3c6e,#0d1b2a);color:#fff;text-align:center;padding:20px;border-radius:6px;z-index:10;}
+  .hidden{display:none !important;}
+
+  h1.title{font-size:2.4em;margin:0 0 4px;color:var(--yellow);text-shadow:3px 3px 0 var(--red),0 0 20px rgba(0,0,0,.5);letter-spacing:1px;}
+  h1.title small{display:block;font-size:.4em;color:#fff;text-shadow:none;margin-top:4px;letter-spacing:3px;}
+  .subtitle{color:#cfe8ff;margin-bottom:22px;font-size:1.05em;}
+
+  .btn{cursor:pointer;border:none;border-radius:30px;padding:12px 28px;font-size:1em;font-weight:bold;
+    background:var(--blue);color:#fff;box-shadow:0 4px 0 #1c5f96;margin:6px;transition:transform .08s;font-family:inherit;}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #1c5f96;}
+  .btn.red{background:var(--red);box-shadow:0 4px 0 #9c2a1c;}
+  .btn.green{background:var(--green);box-shadow:0 4px 0 #2e7d32;}
+  .btn.yellow{background:var(--yellow);color:#3a2a00;box-shadow:0 4px 0 #b8890c;}
+  .btn.small{padding:8px 16px;font-size:.85em;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none;}
+
+  .pup-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:14px 0 22px;max-width:640px;}
+  .pup-card{background:var(--panel);color:var(--dark);border-radius:14px;padding:10px 8px;cursor:pointer;border:4px solid transparent;transition:.12s;}
+  .pup-card:hover{transform:translateY(-4px);}
+  .pup-card.selected{border-color:var(--yellow);transform:translateY(-4px);box-shadow:0 6px 14px rgba(0,0,0,.35);}
+  .pup-card canvas{display:block;margin:0 auto;}
+  .pup-card b{display:block;font-size:.95em;margin-top:4px;}
+  .pup-card span{display:block;font-size:.72em;color:#445;margin-top:2px;line-height:1.25;}
+  .pup-card .locked-tag{font-size:.65em;color:#a33;font-weight:bold;}
+
+  .map-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:14px 0 20px;max-width:600px;}
+  .level-card{position:relative;background:var(--panel);color:var(--dark);border-radius:14px;padding:14px;cursor:pointer;border:4px solid transparent;min-width:230px;}
+  .level-card.locked{opacity:.5;cursor:not-allowed;}
+  .level-card:hover:not(.locked){transform:translateY(-3px);}
+  .level-card b{font-size:1.05em;}
+  .level-card .stars{font-size:1.1em;color:#ddd;margin-top:4px;}
+  .level-card .stars .on{color:var(--yellow);}
+  .level-card .lock-icon{position:absolute;top:8px;right:10px;font-size:1.2em;}
+
+  #hud{position:absolute;top:0;left:0;right:0;padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start;
+    pointer-events:none;font-weight:bold;color:#fff;text-shadow:1px 1px 2px rgba(0,0,0,.6);z-index:5;}
+  #hud .hud-box{background:rgba(0,0,0,.35);border-radius:10px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:.9em;}
+  #hearts span{color:#ff5252;font-size:1.1em;margin-right:1px;}
+  #hearts span.empty{color:rgba(255,255,255,.3);}
+  #ability-bar{width:60px;height:8px;background:rgba(255,255,255,.25);border-radius:5px;overflow:hidden;display:inline-block;vertical-align:middle;}
+  #ability-fill{height:100%;background:var(--yellow);width:100%;}
+  #mute-btn{pointer-events:auto;cursor:pointer;background:rgba(0,0,0,.35);border:none;color:#fff;border-radius:8px;padding:5px 9px;font-size:1em;}
+
+  #pause-btn{pointer-events:auto;cursor:pointer;
+    background:rgba(0,0,0,.35);border:none;color:#fff;border-radius:8px;padding:5px 10px;font-size:1em;z-index:6;}
+
+  #touch-controls{position:absolute;bottom:14px;left:0;right:0;display:none;justify-content:space-between;padding:0 14px;z-index:6;pointer-events:none;}
+  #touch-controls .side{display:flex;gap:10px;pointer-events:auto;}
+  .tbtn{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.6);
+    color:#fff;font-size:1.4em;display:flex;align-items:center;justify-content:center;user-select:none;}
+  .tbtn:active{background:rgba(255,255,255,.5);}
+  #touch-controls.show{display:flex;}
+
+  .mission-toast{position:absolute;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;
+    padding:6px 14px;border-radius:20px;font-size:.85em;z-index:6;pointer-events:none;opacity:0;transition:opacity .3s;}
+  .mission-toast.show{opacity:1;}
+
+  .stars-row{font-size:2.2em;margin:10px 0;}
+  .stars-row .on{color:var(--yellow);}
+  .stars-row .off{color:rgba(255,255,255,.25);}
+
+  footer.note{position:absolute;bottom:6px;font-size:.65em;color:rgba(255,255,255,.5);}
+  @media (pointer:coarse){ #touch-controls{display:flex;} }
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <div id="stage">
+    <canvas id="game-canvas" width="960" height="540"></canvas>
+
+    <!-- HUD (only visible during play) -->
+    <div id="hud" class="hidden">
+      <div class="hud-box" id="hearts-box"><span id="hearts"></span></div>
+      <div class="hud-box">🦴 <span id="score-val">0</span></div>
+      <div class="hud-box">🐱 <span id="mission-val">0/0</span></div>
+      <div class="hud-box">⏱ <span id="time-val">0.0</span>s</div>
+      <div class="hud-box">Zdolność <span id="ability-bar"><span id="ability-fill"></span></span></div>
+      <div style="display:flex;gap:6px;">
+        <button id="pause-btn">⏸</button>
+        <button id="mute-btn">🔊</button>
+      </div>
+    </div>
+    <div class="mission-toast" id="mission-toast"></div>
+
+    <div id="touch-controls">
+      <div class="side">
+        <div class="tbtn" id="t-left">◀</div>
+        <div class="tbtn" id="t-right">▶</div>
+      </div>
+      <div class="side">
+        <div class="tbtn" id="t-ability">★</div>
+        <div class="tbtn" id="t-jump">⤒</div>
+      </div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div class="screen" id="screen-start">
+      <h1 class="title">PSI PATROL<small>PRZYGODOWE MIASTO</small></h1>
+      <p class="subtitle">Fanowska gra platformowa 2D — wybierz psiaka i ratuj miasto!</p>
+      <button class="btn green" id="btn-play">▶ Graj</button>
+      <button class="btn" id="btn-howto">❓ Jak grać</button>
+      <footer class="note">Nieoficjalna gra fanowska, inspirowana serialem PSI Patrol. Grafika oryginalna.</footer>
+    </div>
+
+    <!-- HOW TO PLAY -->
+    <div class="screen hidden" id="screen-howto">
+      <h1 class="title" style="font-size:1.6em;">Jak grać</h1>
+      <div style="max-width:560px;text-align:left;background:rgba(255,255,255,.08);padding:16px 22px;border-radius:12px;line-height:1.6;font-size:.92em;">
+        🎮 <b>Sterowanie:</b> Strzałki / A-D — ruch, Spacja / W / Strzałka w górę — skok, Shift / E — zdolność specjalna, Esc — pauza.<br>
+        🐾 Wybierz jednego z 6 psiaków — każdy ma inną zdolność specjalną.<br>
+        🦴 Zbieraj kości, aby zwiększyć wynik.<br>
+        🐱 Uratuj wszystkie zaginione kotki na poziomie, by zdobyć maksymalną liczbę gwiazdek.<br>
+        ❤️ Masz 3 życia — uważaj na przeszkody i przeciwników. Skacz na przeciwnika, żeby go pokonać!<br>
+        🚩 Dotrzyj do flagi na końcu poziomu, aby go ukończyć i odblokować kolejny.
+      </div>
+      <button class="btn" id="btn-howto-back">Wróć</button>
+    </div>
+
+    <!-- CHARACTER SELECT -->
+    <div class="screen hidden" id="screen-select">
+      <h1 class="title" style="font-size:1.6em;">Wybierz psiaka</h1>
+      <div class="pup-grid" id="pup-grid"></div>
+      <div>
+        <button class="btn" id="btn-select-back">◀ Wróć</button>
+        <button class="btn green" id="btn-select-confirm" disabled>Dalej ▶</button>
+      </div>
+    </div>
+
+    <!-- MAP / LEVEL SELECT -->
+    <div class="screen hidden" id="screen-map">
+      <h1 class="title" style="font-size:1.6em;">Mapa misji</h1>
+      <p class="subtitle" id="map-pup-label"></p>
+      <div class="map-grid" id="map-grid"></div>
+      <button class="btn" id="btn-map-back">◀ Zmień psiaka</button>
+    </div>
+
+    <!-- PAUSE OVERLAY -->
+    <div class="screen hidden" id="screen-pause">
+      <h1 class="title" style="font-size:1.6em;">Pauza</h1>
+      <button class="btn green" id="btn-resume">▶ Wznów</button>
+      <button class="btn" id="btn-restart-level">🔄 Zacznij poziom od nowa</button>
+      <button class="btn red" id="btn-quit-map">🗺 Wróć do mapy</button>
+    </div>
+
+    <!-- LEVEL COMPLETE -->
+    <div class="screen hidden" id="screen-complete">
+      <h1 class="title" style="font-size:1.6em;color:var(--green);">Misja zakończona!</h1>
+      <div class="stars-row" id="complete-stars">☆☆☆</div>
+      <p id="complete-stats" class="subtitle"></p>
+      <div>
+        <button class="btn" id="btn-retry-level">🔄 Zagraj ponownie</button>
+        <button class="btn green" id="btn-next-level">▶ Następny poziom</button>
+      </div>
+      <button class="btn red" id="btn-complete-map" style="margin-top:10px;">🗺 Mapa misji</button>
+    </div>
+
+    <!-- GAME OVER -->
+    <div class="screen hidden" id="screen-gameover">
+      <h1 class="title" style="font-size:1.8em;color:var(--red);">Ojej! Spróbuj jeszcze raz</h1>
+      <p class="subtitle" id="gameover-stats"></p>
+      <button class="btn green" id="btn-retry-gameover">🔄 Spróbuj ponownie</button>
+      <button class="btn red" id="btn-gameover-map">🗺 Mapa misji</button>
+    </div>
+
+    <!-- WIN SCREEN -->
+    <div class="screen hidden" id="screen-win">
+      <h1 class="title" style="font-size:2em;color:var(--yellow);">🏆 Przygodowe Miasto uratowane!</h1>
+      <p class="subtitle" id="win-stats"></p>
+      <button class="btn green" id="btn-win-map">🗺 Zagraj ponownie inny wątek</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   PSI PATROL: PRZYGODOWE MIASTO — fan-made 2D platformer
+   Single-file game. Vector-drawn characters (no external image assets).
+   ========================================================================= */
+
+/* ---------- Persistence (safe against sandboxed environments) ---------- */
+const Storage = (() => {
+  let memory = {};
+  let ok = false;
+  try { localStorage.setItem("__t","1"); localStorage.removeItem("__t"); ok = true; } catch(e){ ok = false; }
+  return {
+    get(key, fallback){
+      try{
+        if(ok){ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+        return memory[key] !== undefined ? memory[key] : fallback;
+      }catch(e){ return fallback; }
+    },
+    set(key, val){
+      try{
+        if(ok){ localStorage.setItem(key, JSON.stringify(val)); }
+        else { memory[key] = val; }
+      }catch(e){ memory[key] = val; }
+    }
+  };
+})();
+
+/* ---------- Sound (WebAudio synth, no audio files needed) ---------- */
+const Sound = (() => {
+  let ctx = null, muted = false;
+  function ensure(){ if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ctx=null; } } return ctx; }
+  function tone(freq, dur, type="sine", vol=.18, startDelay=0, slideTo=null){
+    if(muted) return;
+    const c = ensure(); if(!c) return;
+    const t0 = c.currentTime + startDelay;
+    const osc = c.createOscillator(); const gain = c.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+    if(slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0+dur);
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }
+  return {
+    jump(){ tone(420,.14,"square",.15,0,700); },
+    dash(){ tone(300,.18,"sawtooth",.12,0,900); },
+    collectBone(){ tone(700,.09,"square",.13,0,1100); },
+    collectKitten(){ tone(500,.12,"triangle",.16,0,1000); tone(800,.14,"triangle",.14,.08,1300); },
+    hit(){ tone(160,.25,"sawtooth",.2,0,60); },
+    breakCrate(){ tone(120,.15,"square",.18,0,80); },
+    build(){ tone(500,.1,"square",.12,0,650); },
+    enemyDown(){ tone(220,.16,"square",.16,0,90); },
+    win(){ [523,659,784,1046].forEach((f,i)=>tone(f,.22,"triangle",.15,i*.12)); },
+    lose(){ tone(300,.4,"sawtooth",.16,0,90); },
+    star(){ tone(880,.12,"sine",.15,0,1300); },
+    toggleMute(){ muted = !muted; return muted; },
+    isMuted(){ return muted; }
+  };
+})();
+
+/* ---------- Canvas / constants ---------- */
+const canvas = document.getElementById("game-canvas");
+const ctx2d = canvas.getContext("2d");
+const VW = 960, VH = 540;
+const GRAVITY = 2000;
+const MOVE_SPEED = 240;
+const JUMP_V = -650;
+const GROUND_FRICTION = 1;
+
+/* ---------- Character definitions ---------- */
+const PUPS = [
+  { id:"chase", name:"Chase", role:"Policjant", color:"#2d5fe0", ear:"#1a3ea3",
+    ability:"Susz start", desc:"Szybki susz do przodu, krótka nietykalność.", cooldown:2.6,
+    unlockScore:0 },
+  { id:"marshall", name:"Marshall", role:"Strażak", color:"#e0432d", ear:"#a3271a",
+    ability:"Odporność na ogień", desc:"Nie boi się ognia i odpycha wrogów falą wody.", cooldown:3.2,
+    unlockScore:0 },
+  { id:"skye", name:"Skye", role:"Pilotka", color:"#f06ba8", ear:"#c94588",
+    ability:"Podwójny skok", desc:"Może wykonać drugi skok w powietrzu i szybować.", cooldown:0,
+    unlockScore:0 },
+  { id:"rubble", name:"Rubble", role:"Budowniczy", color:"#f2c12e", ear:"#c99a12",
+    ability:"Wyburzenie", desc:"Rozwala skrzynie na swojej drodze błyskawicznie.", cooldown:1.6,
+    unlockScore:0 },
+  { id:"rocky", name:"Rocky", role:"Recykling", color:"#4caf50", ear:"#2e7d32",
+    ability:"Buduj platformę", desc:"Stawia tymczasową platformę, by przeskoczyć przepaść.", cooldown:4,
+    unlockScore:0 },
+  { id:"zuma", name:"Zuma", role:"Ratownik wodny", color:"#f28a2e", ear:"#c96a12",
+    ability:"Szybkie pływanie", desc:"Pływa błyskawicznie i nie znosi go prąd wody.", cooldown:2.2,
+    unlockScore:0 },
+];
+
+/* ---------- Level definitions ---------- */
+/* Coordinate system: world pixels. Ground/platform rects: {x,y,w,h,type}
+   type: 'ground' | 'plat' | 'ice' | 'crate' | 'spike' | 'water' | 'cloud'(deco only, no collision) */
+function makeLevels(){
+  return [
+    {
+      id:0, name:"Przygodowe Miasto", sub:"Centrum miasta",
+      width: 2600, groundY: 460,
+      sky:["#7ec8ff","#cdeeff"], groundColor:"#5b8a3a", groundTop:"#7bbf4e", accent:"#c9762e",
+      platforms:[
+        {x:0,y:460,w:760,h:80,type:"ground"},
+        {x:840,y:460,w:340,h:80,type:"ground"},
+        {x:960,y:380,w:120,h:20,type:"plat"},
+        {x:1260,y:460,w:120,h:80,type:"ground"},
+        {x:1460,y:460,w:100,h:80,type:"ground"},
+        {x:1460,y:360,w:100,h:16,type:"plat"},
+        {x:1660,y:460,w:940,h:80,type:"ground"},
+        {x:1780,y:370,w:130,h:18,type:"crate"},
+        {x:2100,y:400,w:110,h:18,type:"plat"},
+        {x:2300,y:330,w:110,h:18,type:"plat"},
+      ],
+      hazards:[ {x:1150,y:440,w:80,h:20,type:"fire"}, {x:2050,y:440,w:70,h:20,type:"fire"} ],
+      enemies:[
+        {x:900,y:420,w:38,h:38,range:[840,1160],speed:70,type:"pigeon"},
+        {x:1900,y:420,w:38,h:38,range:[1720,2000],speed:90,type:"pigeon"},
+      ],
+      bones:[ {x:300,y:410},{x:600,y:410},{x:1000,y:330},{x:1500,y:310},{x:2150,y:350},{x:2350,y:280} ],
+      kittens:[ {x:450,y:410},{x:1300,y:410},{x:1830,y:320},{x:2400,y:280} ],
+      goal:{x:2540,y:380,w:40,h:80},
+      startX:60,
+      theme:"city"
+    },
+    {
+      id:1, name:"Farma Farmera Yumiego", sub:"Zbiory jabłek",
+      width: 2800, groundY: 460,
+      sky:["#a7e0ff","#fdf3c9"], groundColor:"#8a5a2b", groundTop:"#c98a3f", accent:"#e0432d",
+      platforms:[
+        {x:0,y:460,w:520,h:80,type:"ground"},
+        {x:600,y:460,w:220,h:80,type:"ground"},
+        {x:900,y:460,w:160,h:80,type:"ground"},
+        {x:900,y:360,w:100,h:16,type:"plat"},
+        {x:1140,y:460,w:120,h:80,type:"ground"},
+        {x:1340,y:400,w:100,h:16,type:"plat"},
+        {x:1540,y:460,w:160,h:80,type:"ground"},
+        {x:1780,y:460,w:130,h:18,type:"crate"},
+        {x:1990,y:460,w:200,h:80,type:"ground"},
+        {x:2270,y:400,w:110,h:16,type:"plat"},
+        {x:2470,y:460,w:330,h:80,type:"ground"},
+      ],
+      hazards:[ {x:1650,y:440,w:60,h:20,type:"spike"}, {x:2400,y:440,w:60,h:20,type:"spike"} ],
+      enemies:[
+        {x:650,y:420,w:40,h:38,range:[600,800],speed:80,type:"goat"},
+        {x:2050,y:420,w:40,h:38,range:[1990,2170],speed:85,type:"goat"},
+        {x:1160,y:420,w:40,h:38,range:[1140,1240],speed:75,type:"goat"},
+      ],
+      bones:[ {x:250,y:410},{x:700,y:410},{x:950,y:310},{x:1380,y:350},{x:1600,y:410},{x:2050,y:410},{x:2310,y:350} ],
+      kittens:[ {x:180,y:410},{x:1180,y:410},{x:2030,y:410},{x:2600,y:410} ],
+      goal:{x:2740,y:380,w:40,h:80},
+      startX:60,
+      theme:"farm"
+    },
+    {
+      id:2, name:"Górska Kraina Jake'a", sub:"Lodowa wyprawa",
+      width: 2900, groundY: 470,
+      sky:["#d7ecff","#ffffff"], groundColor:"#8fa9c9", groundTop:"#eaf6ff", accent:"#2d8fe0",
+      platforms:[
+        {x:0,y:470,w:420,h:70,type:"ice"},
+        {x:500,y:470,w:180,h:70,type:"ice"},
+        {x:760,y:400,w:120,h:16,type:"plat"},
+        {x:960,y:340,w:120,h:16,type:"plat"},
+        {x:1160,y:470,w:160,h:70,type:"ice"},
+        {x:1400,y:400,w:100,h:16,type:"plat"},
+        {x:1580,y:330,w:100,h:16,type:"plat"},
+        {x:1760,y:470,w:200,h:70,type:"ice"},
+        {x:2040,y:410,w:110,h:16,type:"plat"},
+        {x:2260,y:350,w:110,h:16,type:"plat"},
+        {x:2480,y:470,w:420,h:70,type:"ice"},
+      ],
+      hazards:[ {x:680,y:450,w:60,h:20,type:"spike"}, {x:1330,y:450,w:60,h:20,type:"spike"}, {x:2000,y:450,w:30,h:20,type:"spike"} ],
+      enemies:[
+        {x:1200,y:430,w:38,h:38,range:[1160,1300],speed:70,type:"snowball"},
+        {x:2550,y:430,w:38,h:38,range:[2480,2700],speed:95,type:"snowball"},
+      ],
+      bones:[ {x:150,y:420},{x:800,y:350},{x:1000,y:290},{x:1620,y:280},{x:1850,y:420},{x:2280,y:300},{x:2600,y:420} ],
+      kittens:[ {x:600,y:420},{x:1440,y:350},{x:2080,y:360},{x:2750,y:420} ],
+      goal:{x:2840,y:390,w:40,h:80},
+      startX:60,
+      theme:"mountain"
+    },
+    {
+      id:3, name:"Plaża i Ocean", sub:"Ratunek Kapitana Turbota",
+      width: 3000, groundY: 470,
+      sky:["#8fd8ff","#fff2c9"], groundColor:"#e0c67a","groundTop":"#f2df9e", accent:"#2d8fe0",
+      platforms:[
+        {x:0,y:470,w:460,h:70,type:"ground"},
+        {x:540,y:470,w:200,h:70,type:"ground"},
+        {x:820,y:490,w:360,h:50,type:"water"},
+        {x:1260,y:470,w:180,h:70,type:"ground"},
+        {x:1300,y:390,w:100,h:16,type:"plat"},
+        {x:1520,y:490,w:420,h:50,type:"water"},
+        {x:2020,y:470,w:160,h:70,type:"ground"},
+        {x:2260,y:400,w:110,h:16,type:"plat"},
+        {x:2440,y:490,w:300,h:50,type:"water"},
+        {x:2820,y:470,w:180,h:70,type:"ground"},
+      ],
+      hazards:[ {x:1200,y:450,w:50,h:20,type:"spike"} ],
+      enemies:[
+        {x:900,y:455,w:40,h:32,range:[820,1150],speed:60,type:"crab"},
+        {x:1600,y:455,w:40,h:32,range:[1520,1900],speed:70,type:"crab"},
+        {x:2500,y:455,w:40,h:32,range:[2440,2700],speed:65,type:"crab"},
+      ],
+      bones:[ {x:250,y:420},{x:620,y:420},{x:1330,y:340},{x:2060,y:420},{x:2300,y:350},{x:2900,y:420} ],
+      kittens:[ {x:600,y:420},{x:1330,y:420},{x:2100,y:420},{x:2900,y:420} ],
+      goal:{x:2940,y:390,w:40,h:80},
+      startX:60,
+      theme:"beach"
+    },
+  ];
+}
+
+/* ---------- Progress ---------- */
+const Progress = {
+  data: Storage.get("psiPatrolProgress_v1", { unlocked:1, stars:{}, bestTime:{} }),
+  save(){ Storage.set("psiPatrolProgress_v1", this.data); },
+  unlockNext(idx){ if(this.data.unlocked < idx+2){ this.data.unlocked = idx+2; this.save(); } },
+  setStars(idx, stars, time){
+    const prev = this.data.stars[idx]||0;
+    if(stars>prev) this.data.stars[idx]=stars;
+    const prevTime = this.data.bestTime[idx];
+    if(prevTime===undefined || time<prevTime) this.data.bestTime[idx]=time;
+    this.save();
+  }
+};
+
+/* ---------- Input ---------- */
+const Keys = {};
+const AbilityKey = { down:false, justPressed:false };
+window.addEventListener("keydown", e=>{
+  Keys[e.code]=true;
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+  if(e.code==="ShiftLeft"||e.code==="ShiftRight"||e.code==="KeyE"){ if(!AbilityKey.down) AbilityKey.justPressed=true; AbilityKey.down=true; }
+  if(e.code==="Escape"){ togglePause(); }
+});
+window.addEventListener("keyup", e=>{
+  Keys[e.code]=false;
+  if(e.code==="ShiftLeft"||e.code==="ShiftRight"||e.code==="KeyE"){ AbilityKey.down=false; }
+});
+function bindHold(el, onDown, onUp){
+  const start=ev=>{ ev.preventDefault(); onDown(); };
+  const end=ev=>{ ev.preventDefault(); onUp(); };
+  el.addEventListener("touchstart", start, {passive:false});
+  el.addEventListener("touchend", end, {passive:false});
+  el.addEventListener("touchcancel", end, {passive:false});
+  el.addEventListener("mousedown", start);
+  el.addEventListener("mouseup", end);
+  el.addEventListener("mouseleave", end);
+}
+bindHold(document.getElementById("t-left"), ()=>Keys["ArrowLeft"]=true, ()=>Keys["ArrowLeft"]=false);
+bindHold(document.getElementById("t-right"), ()=>Keys["ArrowRight"]=true, ()=>Keys["ArrowRight"]=false);
+bindHold(document.getElementById("t-jump"), ()=>Keys["Space"]=true, ()=>Keys["Space"]=false);
+bindHold(document.getElementById("t-ability"), ()=>{ if(!AbilityKey.down) AbilityKey.justPressed=true; AbilityKey.down=true; }, ()=>AbilityKey.down=false);
+
+/* ---------- Drawing helpers: vector pup sprite ---------- */
+function drawPup(g, x, y, w, h, color, earColor, facing, animT, invuln){
+  g.save();
+  g.translate(x + w/2, y + h/2);
+  if(facing<0) g.scale(-1,1);
+  const bob = Math.sin(animT*10) * 2;
+  if(invuln && Math.floor(animT*20)%2===0){ g.globalAlpha = 0.4; }
+  // tail
+  g.fillStyle = color;
+  g.beginPath(); g.ellipse(-w/2+2, 2+bob, 8,5, -0.5,0,Math.PI*2); g.fill();
+  // body
+  g.beginPath(); g.ellipse(0, 4+bob, w/2-2, h/2-8, 0,0,Math.PI*2); g.fill();
+  // belly
+  g.fillStyle = "#ffffff";
+  g.beginPath(); g.ellipse(2, 8+bob, w/2-10, h/2-14, 0,0,Math.PI*2); g.fill();
+  // head
+  g.fillStyle = color;
+  g.beginPath(); g.arc(w/2-8, -h/2+14+bob, 14, 0, Math.PI*2); g.fill();
+  // ears
+  g.fillStyle = earColor;
+  g.beginPath(); g.moveTo(w/2-18,-h/2+4+bob); g.lineTo(w/2-24,-h/2-10+bob); g.lineTo(w/2-8,-h/2+2+bob); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(w/2+2,-h/2+2+bob); g.lineTo(w/2+10,-h/2-8+bob); g.lineTo(w/2+8,-h/2+8+bob); g.closePath(); g.fill();
+  // snout
+  g.fillStyle = "#fff";
+  g.beginPath(); g.ellipse(w/2+2,-h/2+18+bob, 7,5,0,0,Math.PI*2); g.fill();
+  g.fillStyle = "#333";
+  g.beginPath(); g.arc(w/2+6,-h/2+17+bob,1.6,0,Math.PI*2); g.fill();
+  // eye
+  g.fillStyle="#222"; g.beginPath(); g.arc(w/2-4,-h/2+11+bob,1.8,0,Math.PI*2); g.fill();
+  // badge
+  g.fillStyle = "#ffd23f";
+  g.beginPath(); g.arc(-2, 2+bob, 4,0,Math.PI*2); g.fill();
+  // legs (simple animated)
+  g.fillStyle = color;
+  const legSwing = Math.sin(animT*14)*6;
+  g.fillRect(-10, h/2-14+bob, 6, 12+Math.max(0,legSwing));
+  g.fillRect(6, h/2-14+bob, 6, 12+Math.max(0,-legSwing));
+  g.restore();
+}
+
+function drawEnemy(g, e, animT){
+  g.save(); g.translate(e.x+e.w/2, e.y+e.h/2);
+  const bob = Math.sin(animT*8)*2;
+  if(e.type==="pigeon"){
+    g.fillStyle="#8a8fa3"; g.beginPath(); g.ellipse(0,bob,e.w/2,e.h/2-4,0,0,Math.PI*2); g.fill();
+    g.fillStyle="#5c6178"; g.beginPath(); g.arc(e.w/2-6,-e.h/2+8+bob,7,0,Math.PI*2); g.fill();
+    g.fillStyle="#f2c12e"; g.beginPath(); g.moveTo(e.w/2,-e.h/2+8+bob); g.lineTo(e.w/2+7,-e.h/2+9+bob); g.lineTo(e.w/2,-e.h/2+12+bob); g.fill();
+  } else if(e.type==="goat"){
+    g.fillStyle="#c9b48a"; g.beginPath(); g.ellipse(0,bob,e.w/2,e.h/2-4,0,0,Math.PI*2); g.fill();
+    g.fillStyle="#a88a5c"; g.beginPath(); g.arc(e.w/2-8,-e.h/2+8+bob,8,0,Math.PI*2); g.fill();
+    g.strokeStyle="#5a4a2a"; g.lineWidth=2;
+    g.beginPath(); g.moveTo(e.w/2-4,-e.h/2); g.lineTo(e.w/2-2,-e.h/2-8); g.stroke();
+    g.beginPath(); g.moveTo(e.w/2-12,-e.h/2); g.lineTo(e.w/2-14,-e.h/2-8); g.stroke();
+  } else if(e.type==="snowball"){
+    g.fillStyle="#ffffff"; g.beginPath(); g.arc(0,bob,e.w/2,0,Math.PI*2); g.fill();
+    g.strokeStyle="#bcd6e8"; g.lineWidth=1.5; g.beginPath(); g.arc(0,bob,e.w/2,0,Math.PI*2); g.stroke();
+    g.fillStyle="#333"; g.beginPath(); g.arc(-4,-2+bob,1.5,0,Math.PI*2); g.arc(4,-2+bob,1.5,0,Math.PI*2); g.fill();
+  } else if(e.type==="crab"){
+    g.fillStyle="#e0432d"; g.beginPath(); g.ellipse(0,bob,e.w/2,e.h/2-6,0,0,Math.PI*2); g.fill();
+    g.fillStyle="#c9321c";
+    g.beginPath(); g.arc(-e.w/2-2,bob,7,0,Math.PI*2); g.fill();
+    g.beginPath(); g.arc(e.w/2+2,bob,7,0,Math.PI*2); g.fill();
+    g.fillStyle="#222"; g.beginPath(); g.arc(-4,-4+bob,1.6,0,Math.PI*2); g.arc(4,-4+bob,1.6,0,Math.PI*2); g.fill();
+  }
+  g.restore();
+}
+
+/* ---------- Game state ---------- */
+let CURRENT_PUP = null;
+let CURRENT_LEVEL_IDX = 0;
+let LEVELS = makeLevels();
+let game = null; // active runtime state
+let rafId = null;
+let lastTime = 0;
+let paused = false;
+let appState = "start"; // start, howto, select, map, playing, pause, complete, gameover, win
+
+/* ---------- UI: Character select ---------- */
+function buildPupGrid(){
+  const grid = document.getElementById("pup-grid");
+  grid.innerHTML = "";
+  PUPS.forEach(p=>{
+    const card = document.createElement("div");
+    card.className = "pup-card";
+    card.dataset.id = p.id;
+    const c = document.createElement("canvas"); c.width=70; c.height=60;
+    const g = c.getContext("2d");
+    drawPup(g, 5, 4, 60, 46, p.color, p.ear, 1, 0, false);
+    card.appendChild(c);
+    const b = document.createElement("b"); b.textContent = p.name + " · " + p.role; card.appendChild(b);
+    const s = document.createElement("span"); s.textContent = p.ability + " — " + p.desc; card.appendChild(s);
+    card.addEventListener("click", ()=>{
+      document.querySelectorAll(".pup-card").forEach(el=>el.classList.remove("selected"));
+      card.classList.add("selected");
+      CURRENT_PUP = p;
+      document.getElementById("btn-select-confirm").disabled = false;
+    });
+    grid.appendChild(card);
+  });
+}
+
+/* ---------- UI: Map ---------- */
+function buildMapGrid(){
+  const grid = document.getElementById("map-grid");
+  grid.innerHTML = "";
+  document.getElementById("map-pup-label").textContent = CURRENT_PUP ? ("Grasz jako: " + CURRENT_PUP.name + " " + emojiFor(CURRENT_PUP.id)) : "";
+  LEVELS.forEach((lvl, idx)=>{
+    const unlocked = idx < Progress.data.unlocked;
+    const card = document.createElement("div");
+    card.className = "level-card" + (unlocked ? "" : " locked");
+    const stars = Progress.data.stars[idx]||0;
+    card.innerHTML = `<b>${idx+1}. ${lvl.name}</b><div style="font-size:.8em;color:#556;">${lvl.sub}</div>
+      <div class="stars">${[1,2,3].map(n=>`<span class="${n<=stars?'on':''}">★</span>`).join("")}</div>
+      ${unlocked ? "" : '<div class="lock-icon">🔒</div>'}`;
+    if(unlocked){
+      card.addEventListener("click", ()=>{ startLevel(idx); });
+    }
+    grid.appendChild(card);
+  });
+}
+function emojiFor(id){
+  return {chase:"🚓",marshall:"🚒",skye:"🚁",rubble:"🚧",rocky:"♻️",zuma:"🌊"}[id]||"🐾";
+}
+
+/* ---------- Screen switching ---------- */
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
+  if(id) document.getElementById(id).classList.remove("hidden");
+}
+function setPlayingChrome(on){
+  document.getElementById("hud").classList.toggle("hidden", !on);
+  document.getElementById("pause-btn").classList.toggle("hidden", !on);
+}
+
+document.getElementById("btn-play").addEventListener("click", ()=>{
+  appState="select"; showScreen("screen-select"); buildPupGrid();
+});
+document.getElementById("btn-howto").addEventListener("click", ()=>{ appState="howto"; showScreen("screen-howto"); });
+document.getElementById("btn-howto-back").addEventListener("click", ()=>{ appState="start"; showScreen("screen-start"); });
+document.getElementById("btn-select-back").addEventListener("click", ()=>{ appState="start"; showScreen("screen-start"); });
+document.getElementById("btn-select-confirm").addEventListener("click", ()=>{
+  appState="map"; showScreen("screen-map"); buildMapGrid();
+});
+document.getElementById("btn-map-back").addEventListener("click", ()=>{
+  appState="select"; showScreen("screen-select"); buildPupGrid();
+});
+document.getElementById("mute-btn").addEventListener("click", (e)=>{
+  const m = Sound.toggleMute(); e.target.textContent = m ? "🔇" : "🔊";
+});
+document.getElementById("pause-btn").addEventListener("click", togglePause);
+document.getElementById("btn-resume").addEventListener("click", togglePause);
+document.getElementById("btn-restart-level").addEventListener("click", ()=>{ paused=false; showScreen(null); setPlayingChrome(true); startLevel(CURRENT_LEVEL_IDX); });
+document.getElementById("btn-quit-map").addEventListener("click", ()=>{ paused=false; appState="map"; setPlayingChrome(false); showScreen("screen-map"); buildMapGrid(); cancelLoop(); });
+document.getElementById("btn-retry-level").addEventListener("click", ()=>startLevel(CURRENT_LEVEL_IDX));
+document.getElementById("btn-next-level").addEventListener("click", ()=>{
+  const next = CURRENT_LEVEL_IDX+1;
+  if(next < LEVELS.length) startLevel(next);
+  else { appState="win"; showScreen("screen-win"); setPlayingChrome(false); renderWinStats(); }
+});
+document.getElementById("btn-complete-map").addEventListener("click", ()=>{ appState="map"; showScreen("screen-map"); buildMapGrid(); setPlayingChrome(false); });
+document.getElementById("btn-retry-gameover").addEventListener("click", ()=>startLevel(CURRENT_LEVEL_IDX));
+document.getElementById("btn-gameover-map").addEventListener("click", ()=>{ appState="map"; showScreen("screen-map"); buildMapGrid(); setPlayingChrome(false); });
+document.getElementById("btn-win-map").addEventListener("click", ()=>{ appState="map"; showScreen("screen-map"); buildMapGrid(); setPlayingChrome(false); });
+
+function togglePause(){
+  if(appState!=="playing" && appState!=="pause") return;
+  if(!paused){
+    paused = true; appState="pause"; showScreen("screen-pause");
+  } else {
+    paused = false; appState="playing"; showScreen(null);
+  }
+}
+
+/* ---------- Level runtime ---------- */
+function startLevel(idx){
+  CURRENT_LEVEL_IDX = idx;
+  const src = LEVELS[idx];
+  const lvl = JSON.parse(JSON.stringify(src)); // deep clone mutable copy
+  const p = CURRENT_PUP;
+  game = {
+    lvl, pup:p,
+    player:{
+      x: lvl.startX, y: lvl.groundY-48, w:34, h:48, vx:0, vy:0,
+      onGround:false, facing:1, lives:3, invulnT:0, animT:0,
+      canDoubleJump:true, usedDoubleJump:false,
+      abilityCooldown:0, abilityActiveT:0, dashT:0,
+    },
+    camX:0, score:0, kittensCollected:0, time:0, finished:false, failed:false,
+    respawnX: lvl.startX, respawnY: lvl.groundY-48,
+    particles:[],
+    toastT:0,
+  };
+  paused = false; appState="playing";
+  showScreen(null); setPlayingChrome(true);
+  document.getElementById("mission-val").textContent = "0/"+lvl.kittens.length;
+  cancelLoop();
+  lastTime = performance.now();
+  rafId = requestAnimationFrame(loop);
+}
+function cancelLoop(){ if(rafId){ cancelAnimationFrame(rafId); rafId=null; } }
+
+function rectsOverlap(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+
+function loop(now){
+  rafId = requestAnimationFrame(loop);
+  let dt = (now-lastTime)/1000; lastTime = now;
+  dt = Math.min(dt, 0.035);
+  if(!paused && appState==="playing"){ update(dt); }
+  render();
+}
+
+function update(dt){
+  const g = game, p = g.player, lvl = g.lvl;
+  g.time += dt; p.animT += dt;
+  document.getElementById("time-val").textContent = g.time.toFixed(1);
+  if(p.abilityCooldown>0) p.abilityCooldown = Math.max(0, p.abilityCooldown-dt);
+  if(p.invulnT>0) p.invulnT -= dt;
+  if(p.abilityActiveT>0) p.abilityActiveT -= dt;
+  if(p.dashT>0) p.dashT -= dt;
+  if(g.toastT>0){ g.toastT -= dt; if(g.toastT<=0) document.getElementById("mission-toast").classList.remove("show"); }
+  document.getElementById("ability-fill").style.width = (100 - Math.min(100, (p.abilityCooldown/g.pup.cooldown)*100)) + "%";
+
+  // horizontal input
+  let moveDir = 0;
+  if(Keys["ArrowLeft"]||Keys["KeyA"]) moveDir -= 1;
+  if(Keys["ArrowRight"]||Keys["KeyD"]) moveDir += 1;
+  if(moveDir!==0) p.facing = moveDir;
+
+  let speed = MOVE_SPEED;
+  if(p.dashT>0) speed = MOVE_SPEED*2.1;
+  // water current: in water zones, non-Zuma pups get pushed back unless holding forward strongly (handled below)
+  const inWater = currentPlatformType(lvl, p) === "water";
+  p.vx = moveDir*speed;
+  if(inWater && g.pup.id !== "zuma"){
+    p.vx += -60; // current pushes left (backward) — must fight through
+    speed *= 0.7;
+    if(moveDir!==0) p.vx = moveDir*speed - 60;
+  }
+
+  // jump
+  const jumpPressed = Keys["Space"]||Keys["ArrowUp"]||Keys["KeyW"];
+  if(jumpPressed && !p._jumpHeldPrev){
+    if(p.onGround){
+      p.vy = JUMP_V; p.onGround=false; Sound.jump(); p.usedDoubleJump=false;
+    } else if(g.pup.id==="skye" && !p.usedDoubleJump){
+      p.vy = JUMP_V*0.85; p.usedDoubleJump=true; Sound.jump();
+    }
+  }
+  p._jumpHeldPrev = jumpPressed;
+  // skye glide: holding jump while falling reduces gravity
+  const gliding = g.pup.id==="skye" && jumpPressed && p.vy>0;
+
+  // ability
+  if(AbilityKey.justPressed){
+    AbilityKey.justPressed = false;
+    tryUseAbility();
+  }
+
+  // physics
+  const grav = gliding ? GRAVITY*0.35 : GRAVITY;
+  p.vy += grav*dt;
+  if(p.vy > 900) p.vy = 900;
+
+  // move X, resolve collisions
+  p.x += p.vx*dt;
+  p.x = Math.max(0, Math.min(lvl.width-p.w, p.x));
+  resolveCollisions(lvl, p, "x");
+  // move Y, resolve collisions
+  p.y += p.vy*dt;
+  p.onGround = false;
+  resolveCollisions(lvl, p, "y");
+
+  if(p.y > VH+150){ // fell into pit
+    damagePlayer(1, true);
+  }
+
+  // hazards
+  for(const h of lvl.hazards){
+    if(rectsOverlap(p,h)){
+      if(h.type==="fire" && g.pup.id==="marshall"){ continue; }
+      if(p.invulnT<=0){ damagePlayer(1,false); }
+    }
+  }
+
+  // enemies
+  for(const e of lvl.enemies){
+    if(e.dead) continue;
+    e.x += (e.dir||1)*e.speed*dt;
+    if(e.x < e.range[0]){ e.x=e.range[0]; e.dir=1; }
+    if(e.x > e.range[1]-e.w){ e.x=e.range[1]-e.w; e.dir=-1; }
+    if(rectsOverlap(p,e)){
+      const stomping = p.vy>0 && (p.y+p.h - e.y) < 22;
+      if(stomping){
+        e.dead = true; p.vy = -420; g.score += 20; Sound.enemyDown();
+        spawnParticles(g, e.x+e.w/2, e.y, "#ffcf4d");
+      } else if(p.invulnT<=0){
+        damagePlayer(1,false);
+      }
+    }
+  }
+
+  // crates: block or break
+  // (handled generically in collision resolution as solid unless broken=true)
+
+  // bones
+  for(const b of lvl.bones){
+    if(b.taken) continue;
+    if(rectsOverlap(p,{x:b.x-10,y:b.y-10,w:20,h:20})){
+      b.taken=true; g.score+=10; Sound.collectBone();
+      document.getElementById("score-val").textContent = g.score;
+      spawnParticles(g,b.x,b.y,"#ffd23f");
+    }
+  }
+  // kittens
+  for(const k of lvl.kittens){
+    if(k.taken) continue;
+    if(rectsOverlap(p,{x:k.x-12,y:k.y-12,w:24,h:24})){
+      k.taken=true; g.kittensCollected++; g.score+=25; Sound.collectKitten();
+      document.getElementById("mission-val").textContent = g.kittensCollected+"/"+lvl.kittens.length;
+      document.getElementById("score-val").textContent = g.score;
+      showToast("Uratowano kotka! 🐱");
+      spawnParticles(g,k.x,k.y,"#ff8fc0");
+    }
+  }
+
+  // temp platforms (rocky ability) lifetime
+  if(lvl._tempPlatforms){
+    lvl._tempPlatforms = lvl._tempPlatforms.filter(tp=>{
+      tp.life -= dt; if(tp.life<=0){ return false; }
+      return true;
+    });
+  }
+
+  // checkpoint: update respawn every 700px of progress on ground
+  if(p.onGround && p.x > g.respawnX+400){
+    g.respawnX = p.x; g.respawnY = p.y-4;
+  }
+
+  // camera
+  g.camX = Math.max(0, Math.min(lvl.width-VW, p.x - VW/2));
+
+  // particles
+  g.particles = g.particles.filter(pt=>{ pt.life -= dt; pt.y += pt.vy*dt; pt.x += pt.vx*dt; pt.vy+=400*dt; return pt.life>0; });
+
+  // goal
+  if(rectsOverlap(p, lvl.goal)){
+    finishLevel();
+  }
+
+  updateHeartsHud();
+}
+
+function currentPlatformType(lvl, p){
+  const feet = {x:p.x, y:p.y+p.h-4, w:p.w, h:8};
+  for(const pl of lvl.platforms){ if(pl.type==="water" && rectsOverlap(feet,pl)) return "water"; }
+  return null;
+}
+
+function resolveCollisions(lvl, p, axis){
+  const all = lvl.platforms.concat(lvl._tempPlatforms||[]);
+  for(const pl of all){
+    if(pl.type==="water"||pl.type==="cloud") continue;
+    if(pl.type==="crate" && pl.broken) continue;
+    if(!rectsOverlap(p,pl)) continue;
+    if(axis==="x"){
+      if(pl.type==="crate"){
+        // crates block horizontally unless broken; Rubble can break via ability (handled elsewhere), passive bump breaks after 3 touches
+        pl._bumps = (pl._bumps||0);
+      }
+      if(p.vx>0) p.x = pl.x - p.w; else if(p.vx<0) p.x = pl.x+pl.w;
+      p.vx = 0;
+    } else {
+      if(p.vy>0){ // falling onto top
+        if(p.y+p.h - pl.y < 26){ p.y = pl.y - p.h; p.vy=0; p.onGround=true; p.usedDoubleJump=false; }
+      } else if(p.vy<0){
+        if(pl.type==="crate"){
+          pl._bumps = (pl._bumps||0)+1;
+          spawnParticles(game, pl.x+pl.w/2, pl.y+pl.h, "#c98a3f");
+          if(pl._bumps>=2){ pl.broken=true; Sound.breakCrate(); }
+        }
+        p.y = pl.y+pl.h; p.vy=0;
+      }
+    }
+  }
+}
+
+function tryUseAbility(){
+  const g = game, p = g.player;
+  if(p.abilityCooldown>0) return;
+  const id = g.pup.id;
+  if(id==="chase"){
+    p.dashT = 0.35; p.invulnT = 0.35; p.abilityCooldown = g.pup.cooldown; Sound.dash();
+    spawnParticles(g,p.x,p.y+p.h/2,"#7fb2ff");
+  } else if(id==="marshall"){
+    p.abilityCooldown = g.pup.cooldown; Sound.build();
+    for(const e of g.lvl.enemies){
+      if(!e.dead && Math.abs((e.x+e.w/2)-(p.x+p.w/2))<160){
+        e.x += (e.x> p.x ? 1:-1)*70; // knockback
+      }
+    }
+    spawnParticles(g,p.x+p.w*p.facing,p.y+p.h/2,"#8fd8ff");
+  } else if(id==="rubble"){
+    p.abilityCooldown = g.pup.cooldown;
+    for(const pl of g.lvl.platforms){
+      if(pl.type==="crate" && !pl.broken && Math.abs((pl.x)-(p.x))<90){ pl.broken=true; Sound.breakCrate(); spawnParticles(g,pl.x,pl.y,"#c98a3f"); }
+    }
+  } else if(id==="rocky"){
+    p.abilityCooldown = g.pup.cooldown;
+    g.lvl._tempPlatforms = g.lvl._tempPlatforms||[];
+    g.lvl._tempPlatforms.push({x:p.x+p.facing*40, y:p.y+p.h-6, w:70, h:14, type:"plat", life:4.5});
+    Sound.build();
+  } else if(id==="zuma"){
+    p.dashT = 0.4; p.abilityCooldown = g.pup.cooldown; Sound.dash();
+  } else if(id==="skye"){
+    // passive double-jump; ability button also triggers a mini glide pulse
+    p.vy = Math.min(p.vy, -180); p.abilityCooldown = 0.4;
+  }
+}
+
+function spawnParticles(g,x,y,color){
+  for(let i=0;i<8;i++){
+    g.particles.push({x,y,vx:(Math.random()-.5)*160,vy:-Math.random()*160,life:.5+Math.random()*.3,color});
+  }
+}
+
+function showToast(text){
+  const t = document.getElementById("mission-toast");
+  t.textContent = text; t.classList.add("show"); game.toastT = 1.6;
+}
+
+function damagePlayer(n, fell){
+  const g = game, p = g.player;
+  if(p.invulnT>0 && !fell) return;
+  p.lives -= n;
+  Sound.hit();
+  if(p.lives<=0){
+    p.lives=0; updateHeartsHud();
+    failLevel();
+    return;
+  }
+  p.invulnT = 1.4;
+  p.x = g.respawnX; p.y = g.respawnY; p.vx=0; p.vy=0;
+  updateHeartsHud();
+}
+
+function updateHeartsHud(){
+  const p = game.player;
+  const el = document.getElementById("hearts");
+  let html = "";
+  for(let i=0;i<3;i++) html += `<span class="${i<p.lives?'':'empty'}">❤</span>`;
+  el.innerHTML = html;
+}
+
+function computeStars(g){
+  const lvl = g.lvl;
+  let stars = 1; // finishing = 1 star
+  if(g.kittensCollected>=lvl.kittens.length) stars++;
+  if(g.player.lives>=2) stars++;
+  return Math.min(3,stars);
+}
+
+function finishLevel(){
+  if(game.finished) return;
+  game.finished = true;
+  paused = true;
+  Sound.win();
+  const stars = computeStars(game);
+  Progress.unlockNext(CURRENT_LEVEL_IDX);
+  Progress.setStars(CURRENT_LEVEL_IDX, stars, game.time);
+  appState="complete";
+  document.getElementById("complete-stars").innerHTML = [1,2,3].map(n=>`<span class="${n<=stars?'on':'off'}">★</span>`).join("");
+  document.getElementById("complete-stats").textContent =
+    `Wynik: ${game.score} pkt · Kotki: ${game.kittensCollected}/${game.lvl.kittens.length} · Czas: ${game.time.toFixed(1)}s`;
+  document.getElementById("btn-next-level").textContent = (CURRENT_LEVEL_IDX+1 < LEVELS.length) ? "▶ Następny poziom" : "🏆 Zakończ przygodę";
+  showScreen("screen-complete"); setPlayingChrome(false);
+  for(let i=0;i<3;i++) setTimeout(()=>Sound.star(), i*160);
+}
+
+function failLevel(){
+  if(game.failed) return;
+  game.failed = true; paused = true; Sound.lose();
+  appState="gameover";
+  document.getElementById("gameover-stats").textContent = `Wynik: ${game.score} pkt · Kotki uratowane: ${game.kittensCollected}/${game.lvl.kittens.length}`;
+  showScreen("screen-gameover"); setPlayingChrome(false);
+}
+
+function renderWinStats(){
+  let total=0, stars=0;
+  LEVELS.forEach((l,i)=>{ total += (Progress.data.bestTime[i]!==undefined?1:0); stars += Progress.data.stars[i]||0; });
+  document.getElementById("win-stats").textContent = `Ukończono wszystkie misje jako ${CURRENT_PUP.name}! Łączna liczba gwiazdek: ${stars}/12.`;
+}
+
+/* ---------- Rendering ---------- */
+function drawBackground(lvl, camX){
+  const grad = ctx2d.createLinearGradient(0,0,0,VH);
+  grad.addColorStop(0, lvl.sky[0]); grad.addColorStop(1, lvl.sky[1]);
+  ctx2d.fillStyle = grad; ctx2d.fillRect(0,0,VW,VH);
+  // simple parallax hills/clouds
+  ctx2d.save();
+  const parX = -camX*0.3;
+  ctx2d.fillStyle = "rgba(255,255,255,.55)";
+  for(let i=0;i<8;i++){
+    const bx = (i*420 + parX) % (VW+400) - 200;
+    ctx2d.beginPath(); ctx2d.ellipse(bx,70+((i%3)*20),46,20,0,0,Math.PI*2); ctx2d.fill();
+    ctx2d.beginPath(); ctx2d.ellipse(bx+34,60+((i%3)*20),32,16,0,0,Math.PI*2); ctx2d.fill();
+  }
+  const parX2 = -camX*0.55;
+  ctx2d.fillStyle = lvl.theme==="mountain" ? "rgba(255,255,255,.7)" : "rgba(0,0,0,.08)";
+  for(let i=0;i<10;i++){
+    const bx = (i*300 + parX2) % (VW+400) - 200;
+    ctx2d.beginPath(); ctx2d.moveTo(bx-90,VH-100); ctx2d.lineTo(bx,VH-220); ctx2d.lineTo(bx+90,VH-100); ctx2d.closePath(); ctx2d.fill();
+  }
+  ctx2d.restore();
+}
+
+function render(){
+  if(appState!=="playing" && appState!=="pause") { return; }
+  const g = game, lvl = g.lvl, p = g.player;
+  drawBackground(lvl, g.camX);
+  ctx2d.save();
+  ctx2d.translate(-g.camX, 0);
+
+  // platforms
+  for(const pl of lvl.platforms){
+    drawPlatform(pl);
+  }
+  if(lvl._tempPlatforms) for(const tp of lvl._tempPlatforms){ drawPlatform(tp, true); }
+  // hazards
+  for(const h of lvl.hazards){
+    if(h.type==="fire"){
+      ctx2d.fillStyle="#e0432d";
+      for(let i=0;i<4;i++){
+        const fx = h.x+8+i*(h.w-16)/3;
+        ctx2d.beginPath(); ctx2d.moveTo(fx,h.y+h.h); ctx2d.quadraticCurveTo(fx-6,h.y+6+Math.sin(p.animT*8+i)*4,fx,h.y-6); ctx2d.quadraticCurveTo(fx+6,h.y+6,fx,h.y+h.h); ctx2d.fill();
+      }
+    } else if(h.type==="spike"){
+      ctx2d.fillStyle="#7a7f8c";
+      const n = Math.max(1,Math.floor(h.w/16));
+      for(let i=0;i<n;i++){ ctx2d.beginPath(); ctx2d.moveTo(h.x+i*16,h.y+h.h); ctx2d.lineTo(h.x+i*16+8,h.y); ctx2d.lineTo(h.x+i*16+16,h.y+h.h); ctx2d.closePath(); ctx2d.fill(); }
+    }
+  }
+  // goal flag
+  ctx2d.fillStyle="#8a5a2b"; ctx2d.fillRect(lvl.goal.x+lvl.goal.w/2-3, lvl.goal.y, 6, lvl.goal.h);
+  ctx2d.fillStyle="#4caf50"; ctx2d.beginPath();
+  ctx2d.moveTo(lvl.goal.x+lvl.goal.w/2+3, lvl.goal.y+6);
+  ctx2d.lineTo(lvl.goal.x+lvl.goal.w/2+38, lvl.goal.y+16);
+  ctx2d.lineTo(lvl.goal.x+lvl.goal.w/2+3, lvl.goal.y+26);
+  ctx2d.closePath(); ctx2d.fill();
+
+  // bones
+  for(const b of lvl.bones){ if(b.taken) continue; drawBone(b.x,b.y,p.animT); }
+  // kittens
+  for(const k of lvl.kittens){ if(k.taken) continue; drawKitten(k.x,k.y,p.animT); }
+  // enemies
+  for(const e of lvl.enemies){ if(!e.dead) drawEnemy(ctx2d, e, p.animT); }
+  // particles
+  for(const pt of g.particles){ ctx2d.globalAlpha = Math.max(0,pt.life*2); ctx2d.fillStyle=pt.color; ctx2d.fillRect(pt.x,pt.y,4,4); ctx2d.globalAlpha=1; }
+  // player
+  drawPup(ctx2d, p.x, p.y, p.w, p.h, g.pup.color, g.pup.ear, p.facing, p.animT, p.invulnT>0);
+
+  ctx2d.restore();
+}
+
+function drawPlatform(pl, temp){
+  const lvl = game.lvl;
+  if(pl.type==="crate"){
+    if(pl.broken) return;
+    ctx2d.fillStyle = "#c98a3f"; ctx2d.fillRect(pl.x,pl.y,pl.w,pl.h);
+    ctx2d.strokeStyle="#8a5a2b"; ctx2d.lineWidth=3; ctx2d.strokeRect(pl.x+2,pl.y+2,pl.w-4,pl.h-4);
+    ctx2d.beginPath(); ctx2d.moveTo(pl.x,pl.y); ctx2d.lineTo(pl.x+pl.w,pl.y+pl.h); ctx2d.moveTo(pl.x+pl.w,pl.y); ctx2d.lineTo(pl.x,pl.y+pl.h); ctx2d.stroke();
+    return;
+  }
+  if(pl.type==="water"){
+    ctx2d.fillStyle = "rgba(45,143,224,.55)";
+    ctx2d.fillRect(pl.x,pl.y,pl.w,pl.h);
+    ctx2d.strokeStyle="rgba(255,255,255,.6)"; ctx2d.lineWidth=2;
+    for(let i=0;i<pl.w;i+=20){ ctx2d.beginPath(); ctx2d.arc(pl.x+i+10,pl.y+6+Math.sin((Date.now()/300)+i)*2,6,Math.PI,0); ctx2d.stroke(); }
+    return;
+  }
+  if(temp){ ctx2d.fillStyle = "rgba(76,175,80,.85)"; ctx2d.fillRect(pl.x,pl.y,pl.w,pl.h); return; }
+  const top = pl.type==="ice" ? "#eaf6ff" : (pl.type==="plat" ? (lvl.accent||"#8a5a2b") : (lvl.groundTop||"#7bbf4e"));
+  const body = pl.type==="ice" ? "#bcd6e8" : (lvl.groundColor||"#5b8a3a");
+  ctx2d.fillStyle = body; ctx2d.fillRect(pl.x, pl.y, pl.w, pl.h);
+  ctx2d.fillStyle = top; ctx2d.fillRect(pl.x, pl.y, pl.w, 10);
+}
+
+function drawBone(x,y,t){
+  ctx2d.save(); ctx2d.translate(x,y+Math.sin(t*4)*4);
+  ctx2d.fillStyle="#fff8e0"; ctx2d.strokeStyle="#d8c98a"; ctx2d.lineWidth=1.5;
+  ctx2d.fillRect(-10,-3,20,6);
+  [-10,10].forEach(dx=>{ [-4,4].forEach(dy=>{ ctx2d.beginPath(); ctx2d.arc(dx,dy,4,0,Math.PI*2); ctx2d.fill(); ctx2d.stroke(); }); });
+  ctx2d.restore();
+}
+function drawKitten(x,y,t){
+  ctx2d.save(); ctx2d.translate(x,y+Math.sin(t*3)*3);
+  ctx2d.fillStyle="#f2c12e";
+  ctx2d.beginPath(); ctx2d.ellipse(0,0,11,9,0,0,Math.PI*2); ctx2d.fill();
+  ctx2d.beginPath(); ctx2d.moveTo(-8,-7); ctx2d.lineTo(-11,-15); ctx2d.lineTo(-4,-8); ctx2d.fill();
+  ctx2d.beginPath(); ctx2d.moveTo(8,-7); ctx2d.lineTo(11,-15); ctx2d.lineTo(4,-8); ctx2d.fill();
+  ctx2d.fillStyle="#333"; ctx2d.beginPath(); ctx2d.arc(-4,-2,1.4,0,Math.PI*2); ctx2d.arc(4,-2,1.4,0,Math.PI*2); ctx2d.fill();
+  ctx2d.restore();
+}
+
+/* ---------- Initial paint of a static idle scene behind start menu ---------- */
+(function idlePaint(){
+  const lvl = LEVELS[0];
+  const grad = ctx2d.createLinearGradient(0,0,0,VH);
+  grad.addColorStop(0, lvl.sky[0]); grad.addColorStop(1, lvl.sky[1]);
+  ctx2d.fillStyle = grad; ctx2d.fillRect(0,0,VW,VH);
+  ctx2d.fillStyle = "#5b8a3a"; ctx2d.fillRect(0,460,VW,80);
+  ctx2d.fillStyle = "#7bbf4e"; ctx2d.fillRect(0,460,VW,10);
+  drawPup(ctx2d, 420, 400, 60, 70, "#2d5fe0", "#1a3ea3", 1, 0.4, false);
+  drawPup(ctx2d, 500, 405, 55, 65, "#e0432d", "#a3271a", -1, 1.1, false);
+})();
+</script>
+</body>
+</html>
